@@ -13,13 +13,44 @@ args = parser.parse_args()
 VPN_IP = args.VPN_IP  # Address to listen on
 VPN_PORT = args.VPN_port  # Port to listen on (non-privileged ports are > 1023)
 
+#parses message with dilineated values of "|"
 def parse_message(message):
     message = message.decode("utf-8")
+    spliced = message.split('|')
+    SERVER_IP=spliced[1]
+    print(SERVER_IP)
+    SERVER_PORT=int(spliced[2])
+    MES = spliced[0]
     # Parse the application-layer header into the destination SERVER_IP, destination SERVER_PORT,
-    # and message to forward to that destination
-    raise NotImplementedError("Your job is to fill this function in. Remove this line when you're done.")
-    return SERVER_IP, SERVER_PORT, message
+    # and message to forward to that destination 
+    return SERVER_IP, SERVER_PORT, MES
 
+#starting VPN
+print("VPN starting - listening for connections at IP", VPN_IP, "and port", VPN_PORT)
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    #s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind((VPN_IP, VPN_PORT))
+    s.listen()
+    conn, addr = s.accept()
+    with conn:
+        print(f"Connected established with client {addr}")
+        while True:
+            data = conn.recv(1024)
+            serverip, serverport, message = parse_message(data)
+            if not data:
+                break
+            print(f"Received client message: '{data!r}' [{len(data)} bytes] from client")
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((serverip, serverport))
+                print(f"connection established with server , sending message '{message}'")
+                s.sendall(bytes(message, 'utf-8'))
+                print("message sent to server, waiting for reply")
+                data = s.recv(1024).decode("utf-8")
+                print("message recieved from server")
+            print(f"sending '{data!r}' to client")
+            conn.sendall(bytes(data, 'utf-8'))
+            break
+print("VPN is done!")
 ### INSTRUCTIONS ###
 # The VPN, like the server, must listen for connections from the client on IP address
 # VPN_IP and port VPN_port. Then, once a connection is established and a message recieved,
